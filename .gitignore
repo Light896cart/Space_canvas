@@ -3,7 +3,7 @@ __pycache__/
 *.log
 logs/
 experiments/
-data/
+
 *.pth
 *.pt
 *.ckpt
@@ -14,5 +14,5 @@ data/
 # Виртуальная среда
 space/
 
-# Датасет
+# База данных
 /data/
