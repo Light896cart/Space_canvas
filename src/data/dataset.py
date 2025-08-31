@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
@@ -35,9 +36,20 @@ class Space_dataset(Dataset):
         if os.path.exists(image_path):
             image = Image.open(image_path)
         else:
-            image = get_ps1_image(ra,dec)
-        plt.imshow(image)
-        plt.show()
+            matrix = get_ps1_image(ra,dec)
+
+            if matrix.dtype != np.uint8:
+                if matrix.max() <= 1.0:
+                    matrix = (matrix * 255).astype(np.uint8)
+                else:
+                    matrix = np.clip(matrix, 0, 255).astype(np.uint8)
+
+            # Преобразуем матрицу в изображение
+            image = Image.fromarray(matrix)
+            image.save(image_path)
+        print('Итерация')
+        # plt.imshow(image)
+        # plt.show()
         return label_tensor
 
 path_csv = r'D:\Code\Space_canvas\data\spall_csv_chunks_encoded\spall_chunk_0001.csv'
