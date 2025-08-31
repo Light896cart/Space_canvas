@@ -27,6 +27,7 @@ class Space_dataset(Dataset):
 
     def __getitem__(self, item):
         ide = self.df['id'].iloc[item]
+        extra = self.list_x.iloc[item]
         ra, dec = self.list_x['ra'].iloc[item], self.list_x['dec'].iloc[item]
         label = self.list_label.iloc[item].to_numpy()
         label_tensor = torch.tensor(label, dtype=torch.long)  # или float, если нужно
@@ -43,14 +44,13 @@ class Space_dataset(Dataset):
                     matrix = (matrix * 255).astype(np.uint8)
                 else:
                     matrix = np.clip(matrix, 0, 255).astype(np.uint8)
-
             # Преобразуем матрицу в изображение
             image = Image.fromarray(matrix)
             image.save(image_path)
         print('Итерация')
         # plt.imshow(image)
         # plt.show()
-        return label_tensor
+        return image,label_tensor
 
 path_csv = r'D:\Code\Space_canvas\data\spall_csv_chunks_encoded\spall_chunk_0001.csv'
 path_img = r'D:\Code\Space_canvas\data\image_data\img_csv'
