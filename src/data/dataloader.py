@@ -4,9 +4,9 @@ from torch.utils.data import DataLoader, Dataset, random_split
 from src.data.dataset import Space_dataset
 
 
-def create_train_val_dataloader(img_path,path_img):
+def create_train_val_dataloader(img_path,path_img,transform):
     # Пример данных
-    dataset = Space_dataset(path_csv=img_path,path_img=path_img,list_label=['cod_class','cod_subclass'],list_x=['ra','dec'])
+    dataset = Space_dataset(path_csv=img_path,path_img=path_img,list_label=['cod_class','cod_subclass'],list_x=['ra','dec'],transform=transform)
     # Задаём пропорции
     train_ratio = 0.8
     val_ratio = 0.2
@@ -16,4 +16,5 @@ def create_train_val_dataloader(img_path,path_img):
     # Разделяем
     train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 
-    print(train_dataset)
+    train_dataset = DataLoader(train_dataset,batch_size=2,shuffle=True)
+    return train_dataset
