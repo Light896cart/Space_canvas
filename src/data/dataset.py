@@ -6,19 +6,26 @@ from torch.utils.data import Dataset
 import pandas as pd
 import os
 from logs import logger
-
+from torchvision import transforms
 from src.utils.get_image_ps1 import get_ps1_image
 
 
 class Space_dataset(Dataset):
-    def __init__(self,path_csv:str,path_img:str,list_label=None,list_x=None,transform=None):
+    def __init__(
+            self,
+            path_csv: str,
+            path_img: str,
+            list_label: list[str],
+            list_extrra: list[str] | None = None,
+            transform=transforms.Compose
+            ):
         """
         Создание датасет
 
         Args:
             path_csv: путь к csv данным
             path_img: путь к изображениям
-            list_x: список столбцов для экстра признаков (например, ['z-factor'])
+            list_extrra: список столбцов для экстра признаков (например, ['z-factor'])
             list_label: список столбцов для меток
         Returns:
             Кортеж тензоров (изображение, метка)
@@ -34,7 +41,7 @@ class Space_dataset(Dataset):
             raise FileNotFoundError(f"Папка с изображение не найдена: {path_csv}")
         self.path_img = path_img
         self.list_label = self.df[list_label] # Берем столбцы меток
-        self.list_x = self.df[list_x] # Если есть экстра признаки берем их
+        self.list_x = self.df[list_extrra] # Если есть экстра признаки берем их
 
         self.transform = transform
 
