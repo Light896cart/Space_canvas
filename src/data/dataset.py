@@ -17,7 +17,7 @@ class Space_dataset(Dataset):
             path_img: str,
             list_label: list[str],
             list_extrra: list[str] | None = None,
-            transform=transforms.Compose
+            transform: transforms.Compose | None = None
             ):
         """
         Создание датасет
@@ -37,23 +37,26 @@ class Space_dataset(Dataset):
         self.df = pd.read_csv(path_csv)  # Открываем csv файл
         if self.df.empty:
             raise ValueError("CSV файл пустой")
-        if not os.path.exists(path_csv):
-            raise FileNotFoundError(f"Папка с изображение не найдена: {path_csv}")
+        if not os.path.exists(path_img):
+            raise FileNotFoundError(f"Папка с изображение не найдена: {path_img}")
         self.path_img = path_img
         self.list_label = self.df[list_label] # Берем столбцы меток
-        self.list_x = self.df[list_extrra] # Если есть экстра признаки берем их
-
+        if list_extrra is not None:
+            self.list_extrra = self.df[list_extrra] # Если есть экстра признаки берем их
+        else:
+            self.list_extrra = None
         self.transform = transform
 
     def __len__(self):
         return len(self.df)
 
-    def __getitem__(self, item):
+    def __getitem__(self, item)  -> tuple[torch.Tensor,torch.Tensor] :
         ide = self.df['id'].iloc[item]
-        ra, dec = self.list_x['ra'].iloc[item], self.list_x['dec'].iloc[item]  # берем ra и dec (координаты)
 
-        if not self.list_x.empty:
-            extra = self.list_x.iloc[item]
+        ra, dec = self.df['ra'].iloc[item], self.df['dec'].iloc[item]  # берем ra и dec (координаты)
+        if self.list_extrra:
+            if not self.list_extrra.empty:
+                extra = self.list_extrra.iloc[item]
 
         label = self.list_label.iloc[item].to_numpy()  # Берем метки и преобразовываем их в числа
         label_tensor = torch.tensor(label, dtype=torch.long)  # Теперь в тензор
@@ -82,6 +85,7 @@ class Space_dataset(Dataset):
 
             image = Image.fromarray(matrix) # Из матрицы делаем изображение
             image.save(image_path)
+            print(f"Сохранили {image_path}")
             logger.debug(f"Сохранили {image_path}")
 
         if self.transform:
