@@ -44,4 +44,5 @@ def create_train_val_dataloader(
     train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 
     train_dataset = DataLoader(train_dataset,batch_size=32,shuffle=True)
-    return train_dataset
+    val_dataset = DataLoader(val_dataset,batch_size=32,shuffle=False)
+    return train_dataset,val_dataset
