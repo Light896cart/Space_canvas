@@ -9,6 +9,7 @@ def create_train_val_dataloader(
         path_csv: str,
         path_img: str,
         list_label: list[str],
+        train_ratio: int | None = 0.9,
         list_extra: list[str] | None = None,
         transform: transforms.Compose | None = None,
 ):
@@ -19,7 +20,8 @@ def create_train_val_dataloader(
         path_csv: путь до файла csv
         path_img: путь до папки с изображениями
         list_label: список с названиями столбцов с метками
-        list_extra: список с названиеями столбцов с дополнительными признакми
+        train_ratio: процент тренировочных данных от всего датасета
+        list_extra: список с названиями столбцов с дополнительными признаками
         transform: трансформер
 
     Return:
@@ -35,8 +37,6 @@ def create_train_val_dataloader(
         transform=transform
     )
     # Задаём пропорции
-    train_ratio = 0.8
-    val_ratio = 0.2
     train_size = int(train_ratio * len(dataset))
     val_size = len(dataset) - train_size
 
@@ -44,4 +44,5 @@ def create_train_val_dataloader(
     train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 
     train_dataset = DataLoader(train_dataset,batch_size=32,shuffle=True)
-    return train_dataset
+    val_dataset = DataLoader(val_dataset,batch_size=32,shuffle=False)
+    return train_dataset, val_dataset

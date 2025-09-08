@@ -7,6 +7,7 @@ from torchvision import transforms
 from src.data.dataloader import create_train_val_dataloader
 from src.data.dataset import Space_dataset
 from logs import logger
+from src.model.learn_model import learn_model
 from src.utils.seeding import set_seed
 
 # Определяем корень и путь к configs
@@ -55,15 +56,15 @@ def main(cfg: DictConfig):
 
     logger.info('Создаем датасет')
 
-    reg = create_train_val_dataloader(
+    train_dataset,val_dataset = create_train_val_dataloader(
         path_csv=path_csv,
         path_img=path_img,
         list_extra=list_extra,
         list_label=list_label,
         transform=transform
     )
-    for i,c in enumerate(reg):
-        print(i)
+    reg = learn_model(train_dataset)
+    print(reg)
     # # dataset = Space_dataset(path_csv=path_csv,path_img=img_path,list_label=['cod_class','cod_subclass'],list_x=['ra','dec'])
     # # print("CSV Path:", dataset)
 
