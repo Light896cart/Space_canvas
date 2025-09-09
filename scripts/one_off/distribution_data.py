@@ -39,17 +39,15 @@ def mix_classes_cyclically(
         for cls, count in unique_class.items():
             min_class[cls] = min_class.get(cls, 0) + count
 
-    changed = True
     if not min_value:
         min_value = min(min_class.values())
     global_min_value = min_value
-    while changed:
-        changed = False  # Сбрасываем перед началом прохода
-        print("Новый цикл со значением",first_class)
+    for cls in min_class:
+        print("Новый цикл со значением",cls)
         for filename in files[:limit]:
             df = pd.read_csv(filename)
             # Фильтруем DataFrame — оставляем только нужный класс
-            df_filtered = df[df[name_class] == first_class]
+            df_filtered = df[df[name_class] == cls]
             min_value -= len(df_filtered)
             # Проверяем, существует ли файл
             file_exists = Path(output_file).is_file()
@@ -63,8 +61,6 @@ def mix_classes_cyclically(
             )
             if min_value <= 0:
                 min_value = global_min_value
-                first_class += 1
-                changed = True
                 break
             if len(df_filtered) == 0:
                 break
