@@ -20,6 +20,21 @@ def learn_model(
         transform: transforms.Compose | None = None,
         path_val_dataset: str | None = None
 ):
+    """
+    Обучение нейронной сети
+
+    Args:
+        folder: Путь до папки с csv файлами (до датасета)
+        list_label: Список столбцов для меток
+        path_img: Путь до папки с изображениями
+        train_ratio: Сколько должно быть тренировочных данных в процентах
+        list_extra: Дополнительные экстра параметры которые будут внедрять в модель вместе с изображением
+        transform: Трансформация изображения (изменение изображения)
+        path_val_dataset: Если есть путь до csv файла c валидационными данными можно указать
+
+    Return:
+        None
+    """
     model = BaseModel()
     folder = Path(folder)
 
