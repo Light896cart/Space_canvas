@@ -46,7 +46,7 @@ def main(cfg: DictConfig):
         RuntimeError: если ошибка при создании dataloader
         ValueError: если некорректные параметры в конфиге
     """
-    path_csv = cfg.data.csv_path
+    folder = cfg.data.folder
     path_img = cfg.data.path_img
     path_val_dataset = cfg.data.path_val_dataset
     seed = cfg.seed
@@ -56,17 +56,14 @@ def main(cfg: DictConfig):
     set_seed(seed)
 
     logger.info('Создаем датасет')
-
-    train_dataset,val_dataset = create_train_val_dataloader(
-        path_csv=path_csv,
+    reg = learn_model(
+        folder=folder,
+        list_label=list_label,
         path_img=path_img,
         list_extra=list_extra,
-        list_label=list_label,
         transform=transform,
         path_val_dataset=path_val_dataset
     )
-    reg = learn_model(train_dataset)
-    print(reg)
     # # dataset = Space_dataset(path_csv=path_csv,path_img=img_path,list_label=['cod_class','cod_subclass'],list_x=['ra','dec'])
     # # print("CSV Path:", dataset)
 
