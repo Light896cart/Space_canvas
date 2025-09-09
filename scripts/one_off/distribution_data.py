@@ -9,7 +9,8 @@ def mix_classes_cyclically(
         pattern: str,
         limit: int,
         name_class: str,
-        output_file: str
+        output_file: str,
+        min_value: int | None = None
 ):
     """
     Создаем csv файл с идеальным распределение данных, для тренировочных данных или валидационных (преимущественно)
@@ -20,6 +21,8 @@ def mix_classes_cyclically(
         limit: Какое кол во файлов мы возьмем
         name_class: Относительно какого столбца мы будем делать идеальное распределение
         output_file: По какому пути мы будем сохранять новый csv файл. Например: 'D:\Code\Space_canvas\data\general_csv.csv'
+        min_value: Какое кол во уникальных классов мы хотим увидеть. Например: всего 3 класса, и по 100 вариантов одного
+        уникального класса
     Return:
         None
     """
@@ -37,7 +40,8 @@ def mix_classes_cyclically(
             min_class[cls] = min_class.get(cls, 0) + count
 
     changed = True
-    min_value = min(min_class.values())
+    if not min_value:
+        min_value = min(min_class.values())
     global_min_value = min_value
     while changed:
         changed = False  # Сбрасываем перед началом прохода
@@ -64,15 +68,19 @@ def mix_classes_cyclically(
                 break
             if len(df_filtered) == 0:
                 break
+    df = pd.read_csv(output_file)
+    df = df.sample(frac=1, random_state=42).reset_index(drop=True)
+    df.to_csv(output_file, index=False)
 
 
 pattern = "spall_chunk_*.csv"
-folder = r"D:\Code\Space_canvas\data\spall_csv_chunks_encoded"
-output_file = r'D:\Code\Space_canvas\data\general_csv.csv'
+folder = r"D:\Code\Space_canvas\data\val_csv_dataset"
+output_file = r'D:\Code\Space_canvas\data\val_dataset.csv'
 mix_classes_cyclically(
     folder=folder,
     pattern=pattern,
     limit=50,
     name_class='cod_class',
-    output_file=output_file
+    output_file=output_file,
+    min_value=400
 )
