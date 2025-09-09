@@ -4,7 +4,25 @@ import os
 
 from pathlib import Path
 
-def mix_classes_cyclically(folder,pattern,limit):
+def mix_classes_cyclically(
+        folder: str,
+        pattern: str,
+        limit: int,
+        name_class: str,
+        output_file: str
+):
+    """
+    Создаем csv файл с идеальным распределение данных, для тренировочных данных или валидационных (преимущественно)
+
+    Args:
+        folder: Путь до папки с csv файлами (датасет) (данные уже должны быть закодированы)
+        pattern: Паттерн csv файла. Например: spall_chunk_*.csv (вместо звездочки будут подставляться цифры)
+        limit: Какое кол во файлов мы возьмем
+        name_class: Относительно какого столбца мы будем делать идеальное распределение
+        output_file: По какому пути мы будем сохранять новый csv файл. Например: 'D:\Code\Space_canvas\data\general_csv.csv'
+    Return:
+        None
+    """
     folder = Path(folder)
     # Получаем файлы
     files = sorted(folder.glob(pattern))
@@ -13,12 +31,10 @@ def mix_classes_cyclically(folder,pattern,limit):
 
     for filename in files[:limit]:
         df = pd.read_csv(filename)
-        unique_class = df['cod_class'].value_counts()
+        unique_class = df[name_class].value_counts()
         # Добавляем все пары класс → количество в словарь
         for cls, count in unique_class.items():
             min_class[cls] = min_class.get(cls, 0) + count
-
-    output_file = r'D:\Code\Space_canvas\data\general_csv.csv'
 
     changed = True
     min_value = min(min_class.values())
@@ -29,7 +45,7 @@ def mix_classes_cyclically(folder,pattern,limit):
         for filename in files[:limit]:
             df = pd.read_csv(filename)
             # Фильтруем DataFrame — оставляем только нужный класс
-            df_filtered = df[df['cod_class'] == first_class]
+            df_filtered = df[df[name_class] == first_class]
             min_value -= len(df_filtered)
             # Проверяем, существует ли файл
             file_exists = Path(output_file).is_file()
@@ -52,4 +68,11 @@ def mix_classes_cyclically(folder,pattern,limit):
 
 pattern = "spall_chunk_*.csv"
 folder = r"D:\Code\Space_canvas\data\spall_csv_chunks_encoded"
-mix_classes_cyclically(folder,pattern,50)
+output_file = r'D:\Code\Space_canvas\data\general_csv.csv'
+mix_classes_cyclically(
+    folder=folder,
+    pattern=pattern,
+    limit=50,
+    name_class='cod_class',
+    output_file=output_file
+)
