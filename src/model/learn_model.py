@@ -19,16 +19,33 @@ def learn_model(train_dataset):
     # --- 🔁 Цикл обучения ---
     model.train()
     for epoch in range(1):
-        for epoch in range(1):
-            for batch in train_dataset:
-                images, labels = batch
-                labels = labels[:, 0]  # ← ВАЖНО: (N, 1) → (N,)
+        running_loss = 0.0
+        progress_bar = tqdm(
+            train_dataset,
+            desc=f"Epoch {epoch + 1}/{epoch}",
+            unit="batch",
+            disable=not True,
+            leave=False
+        )
+        for batch in progress_bar:
+            images, labels = batch
+            labels = labels[:, 0]  # ← ВАЖНО: (N, 1) → (N,)
 
-                optimizer.zero_grad()
-                outputs = model(images)  # ← ДОЛЖНО БЫТЬ: (N, 3)
+            optimizer.zero_grad()
+            outputs = model(images)  # ← ДОЛЖНО БЫТЬ: (N, 3)
 
-                loss = criterion(outputs, labels)
-                loss.backward()
-                optimizer.step()
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
 
-                print(f"Loss: {loss.item()}")
+            running_loss += loss.item() * images.size(0)
+            progress_bar.set_postfix(loss=f"{loss.item():.4f}")
+
+            # 👇 Вычисляем accuracy для текущего батча
+            preds = outputs.argmax(dim=1)  # предсказанные классы
+            correct = (preds == labels).sum().item()  # число правильных
+            total = labels.size(0)  # размер батча
+            batch_acc = correct / total * 100.0
+
+            # 🖨 Выводим loss и accuracy для текущего батча
+            print(f"Loss: {loss.item():.4f} | Accuracy: {batch_acc:.2f}%")
