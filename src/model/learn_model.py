@@ -11,7 +11,26 @@ from src.data.dataloader import create_train_val_dataloader
 from src.model.model_architecture import BaseModel
 
 
-def learn_model(
+def eval_model(
+        model,
+        val_dataset,
+):
+    # --- 🟢 Валидация ---
+    model.eval()
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for batch in val_dataset:
+            images, labels = batch
+            labels = labels[:, 0]
+            outputs = model(images)
+            _, predicted = torch.max(outputs, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+            val_acc = correct / total
+            print('ЭТО ВАЛ АССЕС', val_acc)
+
+def train_model(
         folder: str,
         list_label: list[str],
         path_img: str,
@@ -98,20 +117,4 @@ def learn_model(
                     # 🖨 Выводим loss и accuracy для текущего батча
                     print(f"Loss: {loss.item():.4f} | Accuracy: {batch_acc:.2f}%")
     except KeyboardInterrupt:
-        # --- 🟢 Валидация ---
-        model.eval()
-        correct = 0
-        total = 0
-        with torch.no_grad():
-            for batch in val_dataset:
-                images, labels = batch
-                labels = labels[:, 0]
-                outputs = model(images)
-                _, predicted = torch.max(outputs, 1)
-                total += labels.size(0)
-                correct += (predicted == labels).sum().item()
-                val_acc = correct / total
-                print('ЭТО ВАЛ АССЕС',val_acc)
-            val_accuracies.append(val_acc)
-            # --- 📢 Логирование ---
-            print(f"Epoch Val Acc: {val_acc:6.4f} | Best: {best_val_acc:6.4f}")
+        eval_model(model,val_dataset)
