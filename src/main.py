@@ -48,6 +48,7 @@ def main(cfg: DictConfig):
     """
     path_csv = cfg.data.csv_path
     path_img = cfg.data.path_img
+    path_val_dataset = cfg.data.path_val_dataset
     seed = cfg.seed
     list_label = cfg.data.list_label
     list_extra = cfg.data.list_extra
@@ -61,7 +62,8 @@ def main(cfg: DictConfig):
         path_img=path_img,
         list_extra=list_extra,
         list_label=list_label,
-        transform=transform
+        transform=transform,
+        path_val_dataset=path_val_dataset
     )
     reg = learn_model(train_dataset)
     print(reg)

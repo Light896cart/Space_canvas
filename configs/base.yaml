@@ -9,6 +9,7 @@ seed: 42
 data:
   csv_path: 'D:\Code\Space_canvas\data\spall_csv_chunks_encoded\spall_chunk_0001.csv'
   path_img: 'D:\Code\Space_canvas\data\image_data\img_csv'
+  path_val_dataset: 'D:\Code\Space_canvas\data\val_dataset.csv'
   list_label:
     - 'cod_class'
     - 'cod_subclass'
