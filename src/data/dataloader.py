@@ -4,6 +4,8 @@ from torchvision import transforms
 
 from src.data.dataset import Space_dataset
 
+# Глобальный кеш для валидационных датасетов (ключ — путь к CSV)
+_VAL_DATASET_CACHE = {}
 
 def create_train_val_dataloader(
         path_csv: str,
@@ -37,14 +39,22 @@ def create_train_val_dataloader(
         list_extrra=list_extra,
         transform=transform
     )
-    if not path_val_dataset:
-        dataset_val = Space_dataset(
-            path_csv=path_val_dataset,
-            path_img=path_img,
-            list_label=list_label,
-            list_extrra=list_extra,
-            transform=transform
-        )
+    if path_val_dataset:
+        # Проверяем, есть ли уже такой датасет в кеше
+        cache_key = (path_val_dataset, path_img, tuple(list_label), tuple(list_extra or []), id(transform))
+        if cache_key in _VAL_DATASET_CACHE:
+            print(f"🔁 Используем кешированный dataset_val для {path_val_dataset}")
+            dataset_val = _VAL_DATASET_CACHE[cache_key]
+        else:
+            dataset_val = Space_dataset(
+                path_csv=path_val_dataset,
+                path_img=path_img,
+                list_label=list_label,
+                list_extrra=list_extra,
+                transform=transform
+            )
+            _VAL_DATASET_CACHE[cache_key] = dataset_val
+            print(f"✅ Закеширован новый dataset_val для {path_val_dataset}")
     else:
         # Задаём пропорции
         train_size = int(train_ratio * len(dataset_train))
