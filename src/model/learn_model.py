@@ -1,5 +1,6 @@
 from typing import List
 
+import wandb
 from torchvision import transforms
 import torch.optim as optim
 import torch
@@ -29,6 +30,7 @@ def eval_model(
             correct += (predicted == labels).sum().item()
             val_acc = correct / total
             print('ЭТО ВАЛ АССЕС', val_acc)
+
 
 def train_model(
         folder: str,
@@ -60,7 +62,6 @@ def train_model(
     pattern = "spall_chunk_*.csv"
     # Получаем файлы
     files = sorted(folder.glob(pattern))
-    print('патерн',files)
     train_losses = []
     val_accuracies = []
     best_val_acc = 0.0
@@ -113,8 +114,12 @@ def train_model(
                     correct = (preds == labels).sum().item()  # число правильных
                     total = labels.size(0)  # размер батча
                     batch_acc = correct / total * 100.0
-
+                    # 👇 Логируем в любом месте — W&B знает текущий run
+                    wandb.log({
+                        "train_loss": loss.item(),
+                    }, commit=True)
                     # 🖨 Выводим loss и accuracy для текущего батча
                     print(f"Loss: {loss.item():.4f} | Accuracy: {batch_acc:.2f}%")
     except KeyboardInterrupt:
+        wandb.finish()
         eval_model(model,val_dataset)
