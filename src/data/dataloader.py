@@ -43,7 +43,6 @@ def create_train_val_dataloader(
         # Проверяем, есть ли уже такой датасет в кеше
         cache_key = (path_val_dataset, path_img, tuple(list_label), tuple(list_extra or []), id(transform))
         if cache_key in _VAL_DATASET_CACHE:
-            print(f"🔁 Используем кешированный dataset_val для {path_val_dataset}")
             dataset_val = _VAL_DATASET_CACHE[cache_key]
         else:
             dataset_val = Space_dataset(
@@ -54,7 +53,6 @@ def create_train_val_dataloader(
                 transform=transform
             )
             _VAL_DATASET_CACHE[cache_key] = dataset_val
-            print(f"✅ Закеширован новый dataset_val для {path_val_dataset}")
     else:
         # Задаём пропорции
         train_size = int(train_ratio * len(dataset_train))
