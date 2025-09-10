@@ -1,5 +1,7 @@
 import os
 from pathlib import Path
+
+import wandb
 from omegaconf import DictConfig
 import hydra
 from torchvision import transforms
@@ -9,7 +11,7 @@ from src.data.dataset import Space_dataset
 from logs import logger
 from src.model.learn_model import train_model
 from src.utils.seeding import set_seed
-
+from src.utils.wandb_utils import init_wandb
 # Определяем корень и путь к configs
 project_root = Path(__file__).parent.parent
 config_path = str(project_root / "configs")
@@ -53,8 +55,10 @@ def main(cfg: DictConfig):
     list_label = cfg.data.list_label
     list_extra = cfg.data.list_extra
 
-    set_seed(seed)
+    # 👇 Инициализируем W&B для отслеживание метрик
+    init_wandb(cfg)
 
+    set_seed(seed)
     logger.info('Создаем датасет')
     reg = train_model(
         folder=folder,
@@ -64,8 +68,11 @@ def main(cfg: DictConfig):
         transform=transform,
         path_val_dataset=path_val_dataset
     )
-    # # dataset = Space_dataset(path_csv=path_csv,path_img=img_path,list_label=['cod_class','cod_subclass'],list_x=['ra','dec'])
-    # # print("CSV Path:", dataset)
+
+    # ⚠ Завершаем run
+    wandb.finish()
+    # # # dataset = Space_dataset(path_csv=path_csv,path_img=img_path,list_label=['cod_class','cod_subclass'],list_x=['ra','dec'])
+    # # # print("CSV Path:", dataset)
 
 if __name__ == "__main__":
     main()
