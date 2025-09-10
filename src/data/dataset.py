@@ -85,7 +85,6 @@ class Space_dataset(Dataset):
 
             image = Image.fromarray(matrix) # Из матрицы делаем изображение
             image.save(image_path)
-            print(f"Сохранили {image_path}")
             logger.debug(f"Сохранили {image_path}")
 
         if self.transform:
