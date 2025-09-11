@@ -37,7 +37,7 @@ def create_train_val_dataloader(
         path_img=path_img,
         list_label=list_label,
         list_extrra=list_extra,
-        transform=transform
+        # transform=transform
     )
     if path_val_dataset:
         # Проверяем, есть ли уже такой датасет в кеше
@@ -50,7 +50,7 @@ def create_train_val_dataloader(
                 path_img=path_img,
                 list_label=list_label,
                 list_extrra=list_extra,
-                transform=transform
+                # transform=transform
             )
             _VAL_DATASET_CACHE[cache_key] = dataset_val
     else:
