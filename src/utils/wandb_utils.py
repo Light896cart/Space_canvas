@@ -18,5 +18,5 @@ def init_wandb(cfg: DictConfig, project_name: str = "space-ml", job_type: str = 
         project=project_name,
         config=config_dict,
         job_type=job_type,
-        mode="offline",
+        mode="disabled",
     )
