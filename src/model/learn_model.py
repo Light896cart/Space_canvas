@@ -9,6 +9,7 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 from pathlib import Path
 from src.data.dataloader import create_train_val_dataloader
+from src.metrics.classification import compute_batch_metrics
 from src.model.model_architecture import BaseModel
 
 
@@ -59,7 +60,7 @@ def train_model(
     model = BaseModel()
     folder = Path(folder)
 
-    pattern = "spall_chunk_*.csv"
+    pattern = "chunk_*.csv"
     # Получаем файлы
     files = sorted(folder.glob(pattern))
     train_losses = []
@@ -69,7 +70,7 @@ def train_model(
     weight_model_new = None
     bias_model_new = None
     # --- ⚙️ Оптимизатор и лосс ---
-    optimizer = optim.AdamW(model.parameters(), lr=1e-3)
+    optimizer = optim.AdamW(model.parameters(), lr=1e-4)
     criterion = nn.CrossEntropyLoss()
     val_dataset = None
     try:
@@ -95,7 +96,7 @@ def train_model(
                     disable=not True,
                     leave=False
                 )
-                for batch in progress_bar:
+                for step, batch in enumerate(progress_bar):
                     images, labels = batch
                     labels = labels[:, 0]  # ← ВАЖНО: (N, 1) → (N,)
 
@@ -106,20 +107,28 @@ def train_model(
                     loss.backward()
                     optimizer.step()
 
-                    running_loss += loss.item() * images.size(0)
-                    progress_bar.set_postfix(loss=f"{loss.item():.4f}")
+                    # Предсказания и вероятности
+                    preds = outputs.argmax(dim=1)
+                    probs = torch.softmax(outputs, dim=1)
 
-                    # 👇 Вычисляем accuracy для текущего батча
-                    preds = outputs.argmax(dim=1)  # предсказанные классы
-                    correct = (preds == labels).sum().item()  # число правильных
-                    total = labels.size(0)  # размер батча
-                    batch_acc = correct / total * 100.0
-                    # 👇 Логируем в любом месте — W&B знает текущий run
-                    wandb.log({
-                        "train_loss": loss.item(),
-                    }, commit=True)
-                    # 🖨 Выводим loss и accuracy для текущего батча
-                    print(f"Loss: {loss.item():.4f} | Accuracy: {batch_acc:.2f}%")
+                    # Вычисляем метрики по батчу
+                    batch_metrics = compute_batch_metrics(labels, preds, probs, prefix="train")
+
+                    # Добавляем loss
+                    batch_metrics["train_loss"] = loss.item()
+                    print('Обучение')
+                    # Добавляем номер шага (опционально)
+                    batch_metrics["step"] = epoch * len(train_dataset) + step
+
+                    # 🚀 Отправляем ВСЁ в W&B
+                    wandb.log(batch_metrics, commit=True)
+
+                    # 🖨 Опционально: вывод в консоль
+                    progress_bar.set_postfix({
+                        "loss": f"{loss.item():.4f}",
+                        "acc": f"{batch_metrics['train_acc']:.3f}",
+                        "f1": f"{batch_metrics['train_f1']:.3f}"
+                    })
     except KeyboardInterrupt:
         wandb.finish()
         eval_model(model,val_dataset)
