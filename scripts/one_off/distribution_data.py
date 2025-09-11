@@ -69,7 +69,7 @@ def mix_classes_cyclically(
     df.to_csv(output_file, index=False)
 
 
-pattern = "spall_chunk_*.csv"
+pattern = "chunk_*.csv"
 folder = r"D:\Code\Space_canvas\data\val_csv_dataset"
 output_file = r'D:\Code\Space_canvas\data\val_dataset.csv'
 mix_classes_cyclically(
