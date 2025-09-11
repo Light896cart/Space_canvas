@@ -7,7 +7,7 @@ from astropy.table import Table
 from astropy.visualization import PercentileInterval, AsinhStretch
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
-
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 # === Функция для получения URL через таблицу (обязательно) ===
 def get_cutout_url(ra, dec, filter_band='i'):
@@ -33,8 +33,12 @@ def get_cutout_url(ra, dec, filter_band='i'):
         print(f"Ошибка при получении URL ({ra}, {dec}): {e}")
         return None
 
-
 # === Загрузка изображения по URL ===
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, max=10),
+    reraise=True
+)
 def download_image(url):
     """Загружает FITS по URL и возвращает обработанное изображение"""
     try:
@@ -46,7 +50,8 @@ def download_image(url):
         transform = AsinhStretch() + PercentileInterval(99.5)
         return transform(data)
     except Exception as e:
-        return None
+        print('Вот такая вот ошибка',e)
+        raise  # Чтобы retry попробовал снова
 
 
 # === Основная функция: получить изображение ===
