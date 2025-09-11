@@ -7,7 +7,7 @@ import pandas as pd
 import os
 from logs import logger
 from torchvision import transforms
-from src.utils.get_image_ps1 import get_ps1_image
+from src.utils.get_image_ps1 import get_ps1_multiband
 
 
 class Space_dataset(Dataset):
@@ -50,47 +50,25 @@ class Space_dataset(Dataset):
     def __len__(self):
         return len(self.df)
 
-    def __getitem__(self, item)  -> tuple[torch.Tensor,torch.Tensor] :
+    def __getitem__(self, item) -> tuple[torch.Tensor, torch.Tensor]:
         ide = self.df['id'].iloc[item]
+        ra, dec = self.df['ra'].iloc[item], self.df['dec'].iloc[item]
+        label = self.list_label.iloc[item].to_numpy()
+        label_tensor = torch.tensor(label, dtype=torch.long)
 
-        ra, dec = self.df['ra'].iloc[item], self.df['dec'].iloc[item]  # берем ra и dec (координаты)
-        if self.list_extrra:
-            if not self.list_extrra.empty:
-                extra = self.list_extrra.iloc[item]
+        npy_path = os.path.join(self.path_img, f"{ide}.npy")
 
-        label = self.list_label.iloc[item].to_numpy()  # Берем метки и преобразовываем их в числа
-        label_tensor = torch.tensor(label, dtype=torch.long)  # Теперь в тензор
-
-        image_path = os.path.join(self.path_img, f"{ide}.jpg")
-
-        if os.path.exists(image_path):
-            try:
-                image = Image.open(image_path)
-                image = ImageOps.exif_transpose(image)  # Корректная ориентация
-                image.load()
-            except (OSError, IOError) as e:
-                logger.error(f"Не удалось открыть изображение {image_path}: {e}")
-                raise RuntimeError(f"Broken image: {image_path}") from e
+        if os.path.exists(npy_path):
+            matrix = np.load(npy_path)
         else:
-            matrix = get_ps1_image(ra,dec) # Если нет, то обращаемся к функции для получения этого изображения
-            if matrix is None or matrix.size == 0:
-                raise RuntimeError(f"Не удалось получить изображение для ra={ra}, dec={dec}")
+            matrix = get_ps1_multiband(ra, dec)
+            if matrix is None:
+                raise RuntimeError("Не удалось загрузить изображение")
+            np.save(npy_path, matrix)
 
-            if matrix.dtype != np.uint8: # Нормализуем матрицу в [0, 255]
-
-                if matrix.max() <= 1.0:
-                    matrix = (matrix * 255).astype(np.uint8)
-                else:
-                    matrix = np.clip(matrix, 0, 255).astype(np.uint8)
-
-            image = Image.fromarray(matrix) # Из матрицы делаем изображение
-            image.save(image_path)
-            logger.debug(f"Сохранили {image_path}")
-
-        if self.transform:
-            image = self.transform(image)
-
-        return image,label_tensor
+        # Превращаем в тензор: (H, W, 5) -> (5, H, W)
+        image = torch.tensor(matrix, dtype=torch.float32).permute(2, 0, 1)
+        return image, label_tensor
 
     def __repr__(self):
         return f"Space_dataset(len={len(self)}, path_csv={self.path_csv})"
