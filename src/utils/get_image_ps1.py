@@ -1,107 +1,155 @@
-import time
-import matplotlib.pyplot as plt
-import numpy as np
 import requests
-from astropy.io import fits
 from astropy.table import Table
-from astropy.visualization import PercentileInterval, AsinhStretch
-from concurrent.futures import ThreadPoolExecutor
+from astropy.io import fits
+from astropy.visualization import AsinhStretch, PercentileInterval
+import numpy as np
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import BytesIO
-from tenacity import retry, stop_after_attempt, wait_exponential
+import warnings
 
-# === Функция для получения URL через таблицу (обязательно) ===
+# Отключаем предупреждения для скорости
+warnings.filterwarnings('ignore')
+
+# Глобальная сессия для переиспользования соединений
+_session = None
+
+
+def get_session():
+    global _session
+    if _session is None:
+        _session = requests.Session()
+        _session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        })
+    return _session
+
+
 def get_cutout_url(ra, dec, filter_band='i'):
-    """Получает URL на FITS-изображение для заданного RA, Dec и фильтра"""
+    """Оптимизированное получение URL"""
     try:
-        # Запрос к ps1filenames.py
         url_table = f"https://ps1images.stsci.edu/cgi-bin/ps1filenames.py?ra={ra}&dec={dec}&filters={filter_band}"
         table = Table.read(url_table, format='ascii')
 
-        # Фильтруем по нужному фильтру
-        table = table[table['filter'] == filter_band]
-        if len(table) == 0:
+        # Векторизованная фильтрация
+        mask = table['filter'] == filter_band
+        if not np.any(mask):
             return None
 
-        filename = table['filename'][0]  # берём первый файл
-        # Формируем URL для fitscut
+        filename = table['filename'][mask][0]
         url = (
             f"https://ps1images.stsci.edu/cgi-bin/fitscut.cgi?"
             f"ra={ra}&dec={dec}&size=75&format=fits&red={filename}"
         )
         return url
-    except Exception as e:
-        print(f"Ошибка при получении URL ({ra}, {dec}): {e}")
+    except:
         return None
 
-# === Загрузка изображения по URL ===
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, max=10),
-    reraise=True
-)
-def download_image(url):
-    """Загружает FITS по URL и возвращает обработанное изображение"""
+
+def download_image(url, size=75):
+    """Оптимизированная загрузка изображения"""
     try:
-        response = requests.get(url, timeout=10)
+        # Быстрая замена размера
+        if "size=75" in url:
+            url = url.replace("size=75", f"size={size}")
+
+        session = get_session()
+        response = session.get(url, timeout=12)
         response.raise_for_status()
-        with fits.open(BytesIO(response.content)) as hdul:
+
+        # Быстрая обработка FITS
+        with fits.open(BytesIO(response.content), memmap=False, lazy_load_hdus=False) as hdul:
             data = hdul[0].data
-        # Улучшаем контраст
-        transform = AsinhStretch() + PercentileInterval(99.5)
-        return transform(data)
-    except Exception as e:
-        print('Вот такая вот ошибка',e)
-        raise  # Чтобы retry попробовал снова
 
+        if data is None:
+            return None
 
-# === Основная функция: получить изображение ===
-def get_ps1_image(ra, dec, filter_band='i'):
-    url = get_cutout_url(ra, dec, filter_band)
-    if url is None:
+        # Оптимизированная обработка контраста
+        # Используем более быстрые перцентили
+        p995 = np.percentile(data, 99.5)
+        p005 = np.percentile(data, 0.5)
+
+        # Векторизованная нормализация
+        normalized = np.clip((data - p005) / (p995 - p005 + 1e-8), 0, 1)
+
+        # Быстрый asinh stretch
+        stretched = np.arcsinh(normalized * 3) / np.arcsinh(3)
+
+        return stretched.astype(np.float32)
+
+    except Exception:
         return None
-    return download_image(url)
 
 
-# # Старые координаты (ваш первоначальный список)
-# ra_list_old = [35.103846, 35.01667, 34.90911, 34.972713, 34.991105,
-#                35.056275, 35.407754, 35.198357, 35.410434, 35.689222,
-#                35.156116, 35.164636, 35.24326, 35.337295, 35.266138,
-#                35.130754, 35.369911, 35.617758, 35.61671, 35.417946,
-#                35.652879, 35.95899, 36.048021, 36.13731, 36.289988,
-#                36.190746, 36.246152, 35.820523, 35.810521, 35.891618,
-#                35.838609]
-#
-# dec_list_old = [-6.2921282, -6.2686349, -6.0668356, -6.1898776, -6.0930068,
-#                 -6.0171515, -6.4484517, -6.2015798, -6.2627868, -6.2771255,
-#                 -6.1768468, -6.0885777, -6.0288194, -6.1206512, -6.04728,
-#                 -5.8761376, -5.9827167, -6.0965984, -6.0234278, -5.8505189,
-#                 -5.898463, -6.2793123, -6.1544588, -6.2008188, -6.2221293,
-#                 -6.1972574, -6.1384437, -6.0747067, -6.0036851, -6.0810754,
-#                 -5.9334336]
-#
-# # Параллельная загрузка
-# print("Загружаем 10 изображений...")
-# start = time.time()
-#
-# with ThreadPoolExecutor(max_workers=5) as executor:
-#     args = [(ra_list_old[i], dec_list_old[i], 'i') for i in range(len(dec_list_old))]
-#     images = list(executor.map(lambda p: get_ps1_image(*p), args))
-#
-# total_time = time.time() - start
-# print(f"✅ Загружено за {total_time:.2f} сек (среднее {total_time / 10:.2f} с/изобр)")
-#
-# # Отображение
-# fig, axes = plt.subplots(7, 5, figsize=(15, 6))
-# axes = axes.ravel()
-#
-# for i, img in enumerate(images):
-#     if img is not None:
-#         axes[i].imshow(img, cmap='gray', origin='lower', vmin=0, vmax=1)
-#         axes[i].set_title(f"#{i + 1}", fontsize=8)
-#     else:
-#         axes[i].set_title(f"❌ #{i + 1}", color='red', fontsize=8)
-#     axes[i].axis('off')
-#
-# plt.suptitle("10 изображений с PS1 — исправленная загрузка", y=1.02, fontsize=16)
-# plt.tight_layout()
-# plt.show()
+def get_ps1_multiband(ra, dec, filters=('g', 'r', 'i', 'z', 'y'), size=75):
+    """
+    Максимально быстрая рабочая версия
+    """
+    # Предварительная валидация
+    try:
+        ra_float, dec_float = float(ra), float(dec)
+        if not (-360 <= ra_float <= 360 and -90 <= dec_float <= 90):
+            return None
+    except:
+        return None
+
+    # Параллельное получение всех URL
+    urls = {}
+    url_params = [(band, ra, dec, band) for band in filters]
+
+    with ThreadPoolExecutor(max_workers=len(filters)) as executor:
+        # Получаем все URL параллельно
+        future_to_band = {
+            executor.submit(get_cutout_url, ra, dec, band): band
+            for band in filters
+        }
+
+        for future in as_completed(future_to_band):
+            band = future_to_band[future]
+            try:
+                url = future.result()
+                if url is None:
+                    return None
+                urls[band] = url
+            except:
+                return None
+
+    # Параллельная загрузка всех изображений
+    images = {}
+
+    with ThreadPoolExecutor(max_workers=len(filters)) as executor:
+        future_to_band = {
+            executor.submit(download_image, urls[band], size): band
+            for band in filters
+        }
+
+        for future in as_completed(future_to_band):
+            band = future_to_band[future]
+            try:
+                img = future.result()
+                if img is None:
+                    return None
+                images[band] = img
+            except:
+                return None
+
+    # Проверка и сборка куба
+    if len(images) != len(filters):
+        return None
+
+    try:
+        # Быстрая проверка размеров
+        shapes = [img.shape for img in images.values()]
+        if len(set(shapes)) > 1:  # Все формы должны быть одинаковыми
+            return None
+
+        base_shape = shapes[0]
+
+        # Быстрая сборка куба с preallocated array
+        cube = np.empty((*base_shape, len(filters)), dtype=np.float32)
+        for i, band in enumerate(filters):
+            cube[..., i] = images[band]
+
+        return cube
+
+    except Exception:
+        return None
