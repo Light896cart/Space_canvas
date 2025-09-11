@@ -60,7 +60,7 @@ def main(cfg: DictConfig):
 
     set_seed(seed)
     logger.info('Создаем датасет')
-    reg = train_model(
+    train_model(
         folder=folder,
         list_label=list_label,
         path_img=path_img,
