@@ -1,11 +1,17 @@
+"""TODO:
+Ну тут много работы, много что проанализировать и упростить
+"""
+
 import requests
 from astropy.table import Table
 from astropy.io import fits
-from astropy.visualization import AsinhStretch, PercentileInterval
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import BytesIO
 import warnings
+
+from astropy.visualization import AsinhStretch, PercentileInterval
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 # Отключаем предупреждения для скорости
 warnings.filterwarnings('ignore')
@@ -24,8 +30,12 @@ def get_session():
     return _session
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, max=10)
+)
 def get_cutout_url(ra, dec, filter_band='i'):
-    """Оптимизированное получение URL"""
+    """Получение URL с повторными попытками"""
     try:
         url_table = f"https://ps1images.stsci.edu/cgi-bin/ps1filenames.py?ra={ra}&dec={dec}&filters={filter_band}"
         table = Table.read(url_table, format='ascii')
@@ -33,7 +43,7 @@ def get_cutout_url(ra, dec, filter_band='i'):
         # Векторизованная фильтрация
         mask = table['filter'] == filter_band
         if not np.any(mask):
-            return None
+            raise ValueError(f"No filename found for filter {filter_band}")
 
         filename = table['filename'][mask][0]
         url = (
@@ -41,12 +51,16 @@ def get_cutout_url(ra, dec, filter_band='i'):
             f"ra={ra}&dec={dec}&size=75&format=fits&red={filename}"
         )
         return url
-    except:
-        return None
+    except Exception as e:
+        raise ValueError(f"Failed to get cutout URL for {ra}, {dec}, {filter_band}: {str(e)}")
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, max=10)
+)
 def download_image(url, size=75):
-    """Оптимизированная загрузка изображения"""
+    """Загрузка изображения с повторными попытками"""
     try:
         # Быстрая замена размера
         if "size=75" in url:
@@ -59,45 +73,41 @@ def download_image(url, size=75):
         # Быстрая обработка FITS
         with fits.open(BytesIO(response.content), memmap=False, lazy_load_hdus=False) as hdul:
             data = hdul[0].data
+        if data is None or not np.issubdtype(data.dtype, np.number):
+            raise ValueError("Invalid or empty FITS data")
 
-        if data is None:
-            return None
+        transform = AsinhStretch() + PercentileInterval(99.5)
+        data = transform(data)
+        return data
 
-        # Оптимизированная обработка контраста
-        # Используем более быстрые перцентили
-        p995 = np.percentile(data, 99.5)
-        p005 = np.percentile(data, 0.5)
-
-        # Векторизованная нормализация
-        normalized = np.clip((data - p005) / (p995 - p005 + 1e-8), 0, 1)
-
-        # Быстрый asinh stretch
-        stretched = np.arcsinh(normalized * 3) / np.arcsinh(3)
-
-        return stretched.astype(np.float32)
-
-    except Exception:
-        return None
+    except Exception as e:
+        raise ValueError(f"Failed to download/parse image from {url}: {str(e)}")
 
 
+@retry(
+    stop=stop_after_attempt(3),      # Попробуем 3 раза ВСЮ операцию
+    wait=wait_exponential(multiplier=1, max=10)
+)
 def get_ps1_multiband(ra, dec, filters=('g', 'r', 'i', 'z', 'y'), size=75):
     """
-    Максимально быстрая рабочая версия
+    Максимально быстрая рабочая версия — НИКОГДА не возвращает None!
+    Если хоть один фильтр не загрузился — ПОЛНОСТЬЮ ПОВТОРЯЕМ ЗАПРОС.
+    Только после 3 неудачных попыток — возвращаем zeros.
     """
-    # Предварительная валидация
+
+    # Предварительная валидация координат
     try:
         ra_float, dec_float = float(ra), float(dec)
         if not (-360 <= ra_float <= 360 and -90 <= dec_float <= 90):
-            return None
-    except:
-        return None
+            raise ValueError("Invalid RA/DEC coordinates")
+    except (ValueError, TypeError):
+        raise ValueError("Invalid RA/DEC coordinates")
 
-    # Параллельное получение всех URL
+    # Шаг 1: Параллельное получение всех URL
     urls = {}
-    url_params = [(band, ra, dec, band) for band in filters]
+    failed_bands = set()
 
     with ThreadPoolExecutor(max_workers=len(filters)) as executor:
-        # Получаем все URL параллельно
         future_to_band = {
             executor.submit(get_cutout_url, ra, dec, band): band
             for band in filters
@@ -107,14 +117,17 @@ def get_ps1_multiband(ra, dec, filters=('g', 'r', 'i', 'z', 'y'), size=75):
             band = future_to_band[future]
             try:
                 url = future.result()
-                if url is None:
-                    return None
                 urls[band] = url
-            except:
-                return None
+            except Exception:
+                failed_bands.add(band)
 
-    # Параллельная загрузка всех изображений
+    # Если хотя бы один URL не получен — считаем всю операцию проваленной
+    if len(urls) != len(filters):
+        raise ValueError(f"Failed to get URLs for bands: {failed_bands}")
+
+    # Шаг 2: Параллельная загрузка изображений
     images = {}
+    base_shape = None
 
     with ThreadPoolExecutor(max_workers=len(filters)) as executor:
         future_to_band = {
@@ -126,30 +139,26 @@ def get_ps1_multiband(ra, dec, filters=('g', 'r', 'i', 'z', 'y'), size=75):
             band = future_to_band[future]
             try:
                 img = future.result()
-                if img is None:
-                    return None
                 images[band] = img
-            except:
-                return None
+                if base_shape is None:
+                    base_shape = img.shape
+            except Exception:
+                failed_bands.add(band)
 
-    # Проверка и сборка куба
+    # Если хоть одно изображение не загрузилось — поднимаем исключение для retry
     if len(images) != len(filters):
-        return None
+        raise ValueError(f"Failed to download images for bands: {failed_bands}")
 
-    try:
-        # Быстрая проверка размеров
-        shapes = [img.shape for img in images.values()]
-        if len(set(shapes)) > 1:  # Все формы должны быть одинаковыми
-            return None
+    # Убедимся, что все изображения одного размера
+    shapes = [img.shape for img in images.values()]
+    if len(set(shapes)) > 1:
+        raise ValueError("Inconsistent image sizes across filters")
 
-        base_shape = shapes[0]
+    if base_shape is None:
+        base_shape = (size, size)
 
-        # Быстрая сборка куба с preallocated array
-        cube = np.empty((*base_shape, len(filters)), dtype=np.float32)
-        for i, band in enumerate(filters):
-            cube[..., i] = images[band]
-
-        return cube
-
-    except Exception:
-        return None
+    # Шаг 3: Сборка куба — теперь мы уверены, что все данные есть
+    cube = np.empty((*base_shape, len(filters)), dtype=np.float32)
+    for i, band in enumerate(filters):
+        cube[..., i] = images[band]
+    return cube
