@@ -7,7 +7,7 @@ defaults:
 seed: 42
 
 data:
-  folder: 'D:\Code\Space_canvas\data\spall_csv_chunks_encoded'
+  folder: 'D:\Code\Space_canvas\data\train_perfect_imbalance'
   path_img: 'D:\Code\Space_canvas\data\image_data\img_csv'
   path_val_dataset: 'D:\Code\Space_canvas\data\val_dataset.csv'
   list_label:
