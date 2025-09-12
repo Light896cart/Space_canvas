@@ -1,3 +1,8 @@
+"""TODO:
+Нужно будет сделать заполнение нулями только конкретного канала,а не всего изображения
+Так же нужно упростить код
+"""
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
