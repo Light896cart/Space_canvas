@@ -24,6 +24,7 @@ def eval_model(
     with torch.no_grad():
         for batch in val_dataset:
             images, labels = batch
+            images = images[:, :3, :, :]
             labels = labels[:, 0]
             outputs = model(images)
             _, predicted = torch.max(outputs, 1)
@@ -87,7 +88,6 @@ def train_model(
                     transform=transform,
                     path_val_dataset=path_val_dataset
                 )
-                val_dataset = val_dataset
                 running_loss = 0.0
                 progress_bar = tqdm(
                     train_dataset,
@@ -98,11 +98,15 @@ def train_model(
                 )
                 for step, batch in enumerate(progress_bar):
                     images, labels = batch
+                    images = images[:, :3, :, :]
+                    print(images.shape)
                     labels = labels[:, 0]  # ← ВАЖНО: (N, 1) → (N,)
-
+                    # print('Это изображение',images.shape)
+                    # print('сами',images)
                     optimizer.zero_grad()
                     outputs = model(images)  # ← ДОЛЖНО БЫТЬ: (N, 3)
-
+                    print('ЭТО изо',images.mean())
+                    print('ЭТО оут',outputs.mean())
                     loss = criterion(outputs, labels)
                     loss.backward()
                     optimizer.step()
@@ -116,7 +120,7 @@ def train_model(
 
                     # Добавляем loss
                     batch_metrics["train_loss"] = loss.item()
-                    print('Обучение')
+
                     # Добавляем номер шага (опционально)
                     batch_metrics["step"] = epoch * len(train_dataset) + step
 
