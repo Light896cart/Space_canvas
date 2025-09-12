@@ -56,7 +56,7 @@ class Space_dataset(Dataset):
     def __len__(self):
         return len(self.df)
 
-    def __getitem__(self, item) -> tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, item):
         ide = self.df['id'].iloc[item]
         ra, dec = self.df['ra'].iloc[item], self.df['dec'].iloc[item]
         label = self.list_label.iloc[item].to_numpy()
@@ -71,24 +71,25 @@ class Space_dataset(Dataset):
             nan_count = np.isnan(matrix).sum()
             if nan_count > 0:
                 matrix = fill_nan_with_median(matrix, kernel_size=3)
-                # Проверяем, что теперь всё хорошо
-                # Проверяем, что теперь всё хорошо
-                if matrix is None or np.isnan(matrix).any():
-                    print('К сожалению пусто ')
-                    matrix = np.zeros((75, 75, 5), dtype=np.float32)
+
+                # Проверяем по каждому каналу
+                for c in range(matrix.shape[2]):  # 5 каналов
+                    if np.isnan(matrix[:, :, c]).any():
+                        print(f"Канал {c} содержит NaN после фильтрации. Заполняем нулями.")
+                        matrix[:, :, c] = np.zeros((matrix.shape[0], matrix.shape[1]), dtype=np.float32)
             if matrix is None:
                 raise RuntimeError("Не удалось загрузить изображение")
             np.save(npy_path, matrix)
         # Превращаем в тензор: (H, W, 5) -> (5, H, W)
         image = torch.tensor(matrix, dtype=torch.float32).permute(2, 0, 1)
-        return image, label_tensor
+        return image, label_tensor, f"ra {ra}/dec {dec}"
 
     def __repr__(self):
         return f"Space_dataset(len={len(self)}, path_csv={self.path_csv})"
 
 def fill_nan_with_median(matrix, kernel_size=5):
     """
-    Заменяет NaN на медиану окрестности (3x3), только для одного фильтра за раз.
+    Заменяет NaN на медиану окрестности (5x5), только для одного фильтра за раз.
     Безопасно для астрономических изображений.
     """
     matrix_filled = matrix.copy()
