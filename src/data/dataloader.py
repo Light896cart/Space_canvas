@@ -61,6 +61,6 @@ def create_train_val_dataloader(
         # Разделяем
         dataset_train, dataset_val = random_split(dataset_train, [train_size, val_size])
 
-    train_dataset = DataLoader(dataset_train,batch_size=32,shuffle=True)
-    val_dataset = DataLoader(dataset_val,batch_size=32,shuffle=False)
+    train_dataset = DataLoader(dataset_train,batch_size=32,shuffle=True,generator=torch.Generator().manual_seed(42))
+    val_dataset = DataLoader(dataset_val,batch_size=32,shuffle=False,generator=torch.Generator().manual_seed(42))
     return train_dataset, val_dataset
