@@ -10,7 +10,7 @@ class BaseModel(nn.Module):
     def __init__(self):
         super().__init__()
         self.backbone = resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
-        self.backbone.conv1 = nn.Conv2d(5,64,kernel_size=7)
+        self.backbone.conv1 = nn.Conv2d(3,64,kernel_size=7)
         self.backbone.fc = nn.Linear(512, 3)
 
         # Или можно сделать так:
