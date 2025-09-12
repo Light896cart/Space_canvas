@@ -19,8 +19,8 @@ config_path = str(project_root / "configs")
 os.chdir(project_root)
 
 transform = transforms.Compose([
-    transforms.ToTensor(),               # обязательно!
-    # transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])  # опционально
+    # transforms.ToTensor(),               # обязательно!
+    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])  # опционально
 ])
 
 @hydra.main(config_path=config_path, config_name="base", version_base=None)
@@ -48,17 +48,18 @@ def main(cfg: DictConfig):
         RuntimeError: если ошибка при создании dataloader
         ValueError: если некорректные параметры в конфиге
     """
+
     folder = cfg.data.folder
     path_img = cfg.data.path_img
     path_val_dataset = cfg.data.path_val_dataset
     seed = cfg.seed
     list_label = cfg.data.list_label
     list_extra = cfg.data.list_extra
+    set_seed(seed)
 
     # 👇 Инициализируем W&B для отслеживание метрик
     init_wandb(cfg)
 
-    set_seed(seed)
     logger.info('Создаем датасет')
     train_model(
         folder=folder,
