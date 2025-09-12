@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from PIL import Image, ImageOps
+from scipy.ndimage import median_filter
 from torch.utils.data import Dataset
 import pandas as pd
 import os
@@ -62,13 +63,35 @@ class Space_dataset(Dataset):
             matrix = np.load(npy_path)
         else:
             matrix = get_ps1_multiband(ra, dec)
+            nan_count = np.isnan(matrix).sum()
+            if nan_count > 0:
+                matrix = fill_nan_with_median(matrix, kernel_size=3)
+                # Проверяем, что теперь всё хорошо
+                # Проверяем, что теперь всё хорошо
+                if matrix is None or np.isnan(matrix).any():
+                    print('К сожалению пусто ')
+                    matrix = np.zeros((75, 75, 5), dtype=np.float32)
             if matrix is None:
                 raise RuntimeError("Не удалось загрузить изображение")
             np.save(npy_path, matrix)
-
         # Превращаем в тензор: (H, W, 5) -> (5, H, W)
         image = torch.tensor(matrix, dtype=torch.float32).permute(2, 0, 1)
         return image, label_tensor
 
     def __repr__(self):
         return f"Space_dataset(len={len(self)}, path_csv={self.path_csv})"
+
+def fill_nan_with_median(matrix, kernel_size=5):
+    """
+    Заменяет NaN на медиану окрестности (3x3), только для одного фильтра за раз.
+    Безопасно для астрономических изображений.
+    """
+    matrix_filled = matrix.copy()
+    for i in range(matrix.shape[2]):  # по каждому фильтру
+        mask = np.isnan(matrix[:, :, i])
+        if not mask.any():
+            continue
+        # Применяем медианную фильтрацию
+        filled = median_filter(matrix[:, :, i], size=kernel_size, mode='nearest')
+        matrix_filled[:, :, i][mask] = filled[mask]
+    return matrix_filled
