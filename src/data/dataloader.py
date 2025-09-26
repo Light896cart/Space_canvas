@@ -37,7 +37,7 @@ def create_train_val_dataloader(
         path_img=path_img,
         list_label=list_label,
         list_extrra=list_extra,
-        # transform=transform
+        transform=transform
     )
     if path_val_dataset:
         # Проверяем, есть ли уже такой датасет в кеше
@@ -50,7 +50,7 @@ def create_train_val_dataloader(
                 path_img=path_img,
                 list_label=list_label,
                 list_extrra=list_extra,
-                # transform=transform
+                transform=transform
             )
             _VAL_DATASET_CACHE[cache_key] = dataset_val
     else:
@@ -61,6 +61,6 @@ def create_train_val_dataloader(
         # Разделяем
         dataset_train, dataset_val = random_split(dataset_train, [train_size, val_size])
 
-    train_dataset = DataLoader(dataset_train,batch_size=32,shuffle=True,generator=torch.Generator().manual_seed(42))
-    val_dataset = DataLoader(dataset_val,batch_size=32,shuffle=False,generator=torch.Generator().manual_seed(42))
+    train_dataset = DataLoader(dataset_train,batch_size=32,shuffle=True)
+    val_dataset = DataLoader(dataset_val,batch_size=32,shuffle=False)
     return train_dataset, val_dataset
