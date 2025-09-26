@@ -1,12 +1,18 @@
+import re
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import torchvision
 from PIL import Image, ImageOps
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 import os
-from logs import logger
+# from logs import logger
 from torchvision import transforms
+from wandb.sdk.lib.retry import retriable
+
+from src.data.save_annotated_image import generate_sdss_image_dataset
 from src.utils.get_image_ps1 import get_ps1_image
 
 
@@ -69,7 +75,7 @@ class Space_dataset(Dataset):
                 image = ImageOps.exif_transpose(image)  # Корректная ориентация
                 image.load()
             except (OSError, IOError) as e:
-                logger.error(f"Не удалось открыть изображение {image_path}: {e}")
+                # logger.error(f"Не удалось открыть изображение {image_path}: {e}")
                 raise RuntimeError(f"Broken image: {image_path}") from e
         else:
             matrix = get_ps1_image(ra,dec) # Если нет, то обращаемся к функции для получения этого изображения
@@ -85,7 +91,7 @@ class Space_dataset(Dataset):
 
             image = Image.fromarray(matrix) # Из матрицы делаем изображение
             image.save(image_path)
-            logger.debug(f"Сохранили {image_path}")
+            # logger.debug(f"Сохранили {image_path}")
 
         if self.transform:
             image = self.transform(image)
@@ -94,3 +100,81 @@ class Space_dataset(Dataset):
 
     def __repr__(self):
         return f"Space_dataset(len={len(self)}, path_csv={self.path_csv})"
+
+
+transform = torchvision.transforms.Compose([
+    torchvision.transforms.ToTensor(),
+])
+
+class Space_dataset_v2(Dataset):
+    def __init__(
+            self,
+            set_img_csv: str,
+            path_global_csv: str,
+            list_extrra: list[str] | None = None,
+            transform: transforms.Compose | None = None
+    ):
+        self.df = pd.read_csv(path_global_csv)
+        self.set_img_csv = set_img_csv
+
+    def __len__(self):
+        return 1000
+
+    def _get_next_index(self, output_dir):
+        max_index = -1
+        pattern = re.compile(r'img_(\d{6})\.(jpg|csv)$')
+        for filename in os.listdir(output_dir):
+            match = pattern.match(filename)
+            if match:
+                index = int(match.group(1))
+                if index > max_index:
+                    max_index = index
+        return max_index + 1
+
+    def __getitem__(self, item):
+
+        only_img = os.path.join(self.set_img_csv, f"img_{item:06d}.jpg")
+        only_csv = os.path.join(self.set_img_csv, f"img_{item:06d}.csv")
+
+        if os.path.exists(only_img) and os.path.exists(only_csv):
+            image = Image.open(only_img)
+            objects_on_image = pd.read_csv(only_csv)
+        else:
+            next_index = self._get_next_index(self.set_img_csv)
+            image, objects_on_image = generate_sdss_image_dataset(df=self.df)
+
+            img_path = os.path.join(self.set_img_csv, f"img_{next_index:06d}.jpg")
+            annot_path = os.path.join(self.set_img_csv, f"img_{next_index:06d}.csv")
+
+            image.save(img_path)
+            objects_on_image.to_csv(annot_path, index=False)
+
+            self.df = self.df.drop(objects_on_image.index).reset_index(drop=True)
+
+        # --- Собираем аннотации для точек ---
+        points = []
+        for _, row in objects_on_image.iterrows():
+            cls = int(row['cod_class'])  # если нужен класс
+            x_c = float(row['x_center_norm'])
+            y_c = float(row['y_center_norm'])
+
+            points.append([cls, x_c, y_c])  # [class, x, y]
+
+        points = np.array(points, dtype=np.float32)  # shape: (N, 3)
+        print('points.shape',points.shape)
+        print('points',points)
+        return image, points
+        # if os.path.exists(image_path)
+        # if 1==2:
+        #     pass
+        # else:
+        #     img, objects_on_image = generate_sdss_image_dataset()
+        #     # print(img, objects_on_image)
+        # return img,objects_on_image
+
+
+train = Space_dataset_v2(set_img_csv=r'D:\Code\Space_canvas\data\set_img_csv', path_global_csv=r"D:\Code\Space_canvas\data\encoded_csv\optical_search_699065.csv")
+# Space_dataset_v2('reg/val')
+ver = DataLoader(train,batch_size=32,shuffle=True)
+for item in train:
+    print(item)

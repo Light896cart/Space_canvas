@@ -21,7 +21,7 @@ def mix_classes_cyclically(
         limit: Какое кол во файлов мы возьмем
         name_class: Относительно какого столбца мы будем делать идеальное распределение
         output_file: По какому пути мы будем сохранять новый csv файл. Например: 'D:\Code\Space_canvas\data\general_csv.csv'
-        min_value: Какое кол во уникальных классов мы хотим увидеть. Например: всего 3 класса, и по 100 вариантов одного
+        min_value: Какое кол-во уникальных классов мы хотим увидеть. Например: всего 3 класса, и по 100 вариантов одного
         уникального класса
     Return:
         None
@@ -43,7 +43,6 @@ def mix_classes_cyclically(
         min_value = min(min_class.values())
     global_min_value = min_value
     for cls in min_class:
-        print("Новый цикл со значением",cls)
         for filename in files[:limit]:
             df = pd.read_csv(filename)
             # Фильтруем DataFrame — оставляем только нужный класс

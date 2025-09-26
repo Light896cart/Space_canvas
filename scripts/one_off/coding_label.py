@@ -49,7 +49,7 @@ def coding_label_create(path_csv, path_output, n_jobs=-1, verbose=1):
 
     for file in csv_files:
         df_chunk = pd.read_csv(os.path.join(path_csv, file), usecols=['class', 'subclass'],
-                               nrows=1000)  # ограничим для скорости
+                               nrows=100000)  # ограничим для скорости
         all_classes.extend(df_chunk['class'].dropna().unique())
         all_subclasses.extend(df_chunk['subclass'].dropna().unique())
 
@@ -112,7 +112,9 @@ def coding_label_create(path_csv, path_output, n_jobs=-1, verbose=1):
 # 🚀 Вызов функции
 # ———————————————————————————————————
 
-path_csv = r"D:\Code\Space_canvas\data\spall_csv_chunks_cleaned"
-path_output = r"D:\Code\Space_canvas\data\spall_csv_chunks_encoded"
+path_csv = r"D:\Code\Space_canvas\data\raw_csv"
+path_output = r"D:\Code\Space_canvas\data\encoded_csv"
+n_jobs = -1
+verbose = 1
 
 coding_label_create(path_csv, path_output, n_jobs=-1, verbose=1)

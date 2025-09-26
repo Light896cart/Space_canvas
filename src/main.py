@@ -8,7 +8,7 @@ from torchvision import transforms
 
 from src.data.dataloader import create_train_val_dataloader
 from src.data.dataset import Space_dataset
-from logs import logger
+# from logs import logger
 from src.model.learn_model import train_model
 from src.utils.seeding import set_seed
 from src.utils.wandb_utils import init_wandb
@@ -57,9 +57,8 @@ def main(cfg: DictConfig):
 
     # 👇 Инициализируем W&B для отслеживание метрик
     init_wandb(cfg)
-
     set_seed(seed)
-    logger.info('Создаем датасет')
+    # logger.info('Создаем датасет')
     train_model(
         folder=folder,
         list_label=list_label,
@@ -68,7 +67,6 @@ def main(cfg: DictConfig):
         transform=transform,
         path_val_dataset=path_val_dataset
     )
-
     # ⚠ Завершаем run
     wandb.finish()
     # # # dataset = Space_dataset(path_csv=path_csv,path_img=img_path,list_label=['cod_class','cod_subclass'],list_x=['ra','dec'])
