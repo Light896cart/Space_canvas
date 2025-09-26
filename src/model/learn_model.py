@@ -1,8 +1,6 @@
 from typing import List
 
-import numpy as np
 import wandb
-from matplotlib import pyplot as plt
 from torchvision import transforms
 import torch.optim as optim
 import torch
@@ -26,7 +24,6 @@ def eval_model(
     with torch.no_grad():
         for batch in val_dataset:
             images, labels = batch
-            images = images[:, :3, :, :]
             labels = labels[:, 0]
             outputs = model(images)
             _, predicted = torch.max(outputs, 1)
@@ -62,7 +59,7 @@ def train_model(
     """
     model = BaseModel()
     folder = Path(folder)
-    class_names = ['GALAXY','QSO','STAR']
+
     pattern = "chunk_*.csv"
     # Получаем файлы
     files = sorted(folder.glob(pattern))
@@ -90,6 +87,7 @@ def train_model(
                     transform=transform,
                     path_val_dataset=path_val_dataset
                 )
+                val_dataset = val_dataset
                 running_loss = 0.0
                 progress_bar = tqdm(
                     train_dataset,
@@ -99,44 +97,18 @@ def train_model(
                     leave=False
                 )
                 for step, batch in enumerate(progress_bar):
-                    images, labels,coor = batch
-                    images = images[:, :3, :, :]
+                    images, labels = batch
                     labels = labels[:, 0]  # ← ВАЖНО: (N, 1) → (N,)
-
 
                     optimizer.zero_grad()
                     outputs = model(images)  # ← ДОЛЖНО БЫТЬ: (N, 3)
+
                     loss = criterion(outputs, labels)
                     loss.backward()
                     optimizer.step()
 
                     # Предсказания и вероятности
                     preds = outputs.argmax(dim=1)
-
-                    # 🔥 ВИЗУАЛИЗАЦИЯ ВСЕХ 32 ИЗОБРАЖЕНИЙ
-                    img_np = images.cpu().numpy()
-                    true_labels = labels.cpu().numpy()
-                    pred_labels = preds.cpu().numpy()
-
-                    # Сетка 4x8
-                    fig, axes = plt.subplots(4, 8, figsize=(16, 8))
-                    axes = axes.ravel()
-
-                    for i in range(32):
-                        img = np.transpose(img_np[i], (1, 2, 0))  # (C,H,W) -> (H,W,C)
-                        img = np.clip(img, 0, 1)
-                        t = class_names[true_labels[i]]
-                        p = class_names[pred_labels[i]]
-                        print(f'Это {i} фотография')
-                        print(coor[i])
-                        print('-'*50)
-                        axes[i].imshow(img)
-                        axes[i].set_title(f"T: {t}\nP: {p} id {i}", color='green' if t == p else 'red', fontsize=8)
-                        axes[i].axis('off')
-
-                    plt.tight_layout()
-                    plt.show()
-
                     probs = torch.softmax(outputs, dim=1)
 
                     # Вычисляем метрики по батчу
@@ -144,7 +116,7 @@ def train_model(
 
                     # Добавляем loss
                     batch_metrics["train_loss"] = loss.item()
-
+                    print('Обучение')
                     # Добавляем номер шага (опционально)
                     batch_metrics["step"] = epoch * len(train_dataset) + step
 
@@ -157,7 +129,6 @@ def train_model(
                         "acc": f"{batch_metrics['train_acc']:.3f}",
                         "f1": f"{batch_metrics['train_f1']:.3f}"
                     })
-
     except KeyboardInterrupt:
         wandb.finish()
         eval_model(model,val_dataset)
